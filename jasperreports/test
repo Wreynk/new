@@ -1,0 +1,794 @@
+jasperreports/.classpath                           |   7 -
+ .../engine/export/ooxml/DocxDocumentHelper.java    |  14 +-
+ .../engine/export/ooxml/DocxFooterHelper.java      | 199 +++++++++++++
+ .../engine/export/ooxml/DocxHeaderHelper.java      | 331 +++++++++++++++++++++
+ .../engine/export/ooxml/DocxRelsHelper.java        |   2 +
+ .../jasperreports/engine/export/ooxml/DocxZip.java |  12 +
+ .../engine/export/ooxml/JRDocxExporter.java        |  76 ++++-
+ .../engine/export/ooxml/docx/Content_Types.xml     |   2 +
+ 8 files changed, 634 insertions(+), 9 deletions(-)
+ delete mode 100644 jasperreports/.classpath
+ create mode 100644 jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxFooterHelper.java
+ create mode 100644 jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxHeaderHelper.java
+
+diff --git a/jasperreports/.classpath b/jasperreports/.classpath
+deleted file mode 100644
+index 3e25fc0..0000000
+--- a/jasperreports/.classpath
++++ /dev/null
+@@ -1,7 +0,0 @@
+-<?xml version="1.0" encoding="UTF-8"?>
+-<classpath>
+-	<classpathentry kind="src" path="src"/>
+-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+-	<classpathentry kind="con" path="org.apache.ivyde.eclipse.cpcontainer.IVYDE_CONTAINER/?project=jasperreports&amp;ivyXmlPath=ivy.xml&amp;confs=*&amp;ivySettingsPath=ivysettings.xml&amp;loadSettingsOnDemand=false&amp;ivyUserDir=&amp;propertyFiles="/>
+-	<classpathentry kind="output" path="build/classes"/>
+-</classpath>
+diff --git a/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxDocumentHelper.java b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxDocumentHelper.java
+index 965e5f5..2382c53 100644
+--- a/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxDocumentHelper.java
++++ b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxDocumentHelper.java
+@@ -75,12 +75,24 @@ public class DocxDocumentHelper extends BaseHelper
+ 	 */
+ 	public void exportSection(PrintPageFormat pageFormat, JRGridLayout pageGridLayout, boolean lastPage)
+ 	{
++		exportSection(pageFormat, pageGridLayout, lastPage, false, false);
++	}
++	public void exportSection(PrintPageFormat pageFormat, JRGridLayout pageGridLayout, boolean lastPage, boolean isHeader, boolean isFooter)
++	{
+ 		if (!lastPage)
+ 		{
+ 			write("    <w:p>\n");
+ 			write("    <w:pPr>\n");
+ 		}
+ 		write("  <w:sectPr>\n");
++		if(lastPage){
++			if(isHeader){
++				write("   <w:headerReference w:type=\"default\" r:id=\"rId3\"/>\n");
++			}
++			if(isFooter){
++				write("   <w:footerReference w:type=\"default\" r:id=\"rId4\"/>\n");
++			}
++		}
+ 		write("   <w:pgSz w:w=\"" + LengthUtil.twip(pageFormat.getPageWidth()) + "\" w:h=\"" + LengthUtil.twip(pageFormat.getPageHeight()) + "\"");
+ 		write(" w:orient=\"" + (pageFormat.getOrientation() == OrientationEnum.LANDSCAPE ? "landscape" : "portrait") + "\"");
+ 		write("/>\n");
+@@ -118,7 +130,7 @@ public class DocxDocumentHelper extends BaseHelper
+ 				+ bottomMargin
+ 				+ "\" w:left=\""
+ 				+ LengthUtil.twip(leftMargin)
+-				+ "\" w:header=\"0\" w:footer=\"0\" w:gutter=\"0\" />\n");
++				+ "\" w:header=\"200\" w:footer=\"100\" w:gutter=\"0\" />\n");
+ //		write("   <w:cols w:space=\"720\" />\n");
+ 		write("   <w:docGrid w:linePitch=\"" + DEFAULT_LINE_PITCH + "\" />\n");
+ 		write("  </w:sectPr>\n");
+diff --git a/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxFooterHelper.java b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxFooterHelper.java
+new file mode 100644
+index 0000000..44ecc33
+--- /dev/null
++++ b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxFooterHelper.java
+@@ -0,0 +1,199 @@
++/*
++ * JasperReports - Free Java Reporting Library.
++ * Copyright (C) 2001 - 2014 TIBCO Software Inc. All rights reserved.
++ * http://www.jaspersoft.com
++ *
++ * Unless you have purchased a commercial license agreement from Jaspersoft,
++ * the following license terms apply:
++ *
++ * This program is part of JasperReports.
++ *
++ * JasperReports is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * JasperReports is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with JasperReports. If not, see <http://www.gnu.org/licenses/>.
++ */
++package net.sf.jasperreports.engine.export.ooxml;
++
++import java.io.Writer;
++import java.util.Map;
++
++import net.sf.jasperreports.engine.JRPrintText;
++import net.sf.jasperreports.engine.JasperPrint;
++import net.sf.jasperreports.engine.JasperReportsContext;
++import net.sf.jasperreports.engine.util.JRStringUtil;
++import net.sf.jasperreports.engine.util.JRStyledText;
++
++
++/**
++ * 
++ * @author chandan.kumar
++ *
++ */
++public class DocxFooterHelper extends BaseHelper
++{
++
++	/**
++	 * 
++	 */
++	public DocxFooterHelper(JasperReportsContext jasperReportsContext, Writer writer)
++	{
++		super(jasperReportsContext, writer);
++	}
++
++	/**
++	 * 
++	 */
++	public void export(Map<JRPrintText,JRStyledText> footers, String exporterKey)
++	{
++		write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
++		
++		write("<w:ftr xmlns:ve=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"");
++		write(" xmlns:o=\"urn:schemas-microsoft-com:office:office\"");
++		write(" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"");
++		write(" xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\"");
++		write(" xmlns:v=\"urn:schemas-microsoft-com:vml\""); 
++		write(" xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\"");
++		write(" xmlns:w10=\"urn:schemas-microsoft-com:office:word\"");
++		write(" xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"");
++		write(" xmlns:wne=\"http://schemas.microsoft.com/office/word/2006/wordml\">\n");
++		
++		write("<w:p>");
++		write(" <w:pPr>");
++		write("<w:tabs><w:tab w:val=\"center\" w:pos=\"4680\"/><w:tab w:val=\"right\" w:pos=\"9360\"/></w:tabs>");
++		write("<w:spacing w:before=\"60\" w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\" />");
++		//write("<w:jc w:val=\"left\" />");
++		write(" </w:pPr>");
++		
++		String props = null;
++		String alignment = null;
++		boolean skip = false;
++		
++		for(JRPrintText jrPrintText : footers.keySet()){
++			if(skip){
++				skip = false;
++				continue;
++			}
++			JRStyledText styledText = footers.get(jrPrintText);
++			if(null != jrPrintText){
++				if(null != jrPrintText.getFullText() && jrPrintText.getFullText().startsWith("Page")){
++					alignment = getAlignment(jrPrintText);
++					String pageNumbering = getPageNumbering(props,alignment);
++					write(pageNumbering);
++					skip = true;
++					continue;
++				}
++				write(" <w:r>");
++				props = DocxHeaderHelper.exportProps(styledText, jasperReportsContext, exporterKey);
++				if(null != props && props.length() > 0){
++					write(props);
++				}
++				write("<w:ptab w:relativeTo=\"margin\"");
++				write(" w:alignment=\""+ getAlignment(jrPrintText) +"\" w:leader=\"none\"/>");
++				write(" <w:t>" + JRStringUtil.xmlEncode(jrPrintText.getFullText()) +" </w:t>");
++				write(" </w:r>");
++			}
++		}
++		
++		write("</w:p>");
++		
++		write("<w:p>");
++		write(" <w:pPr><w:spacing w:line=\"60\" w:lineRule=\"auto\" />"
++				+ " <w:rPr></w:rPr></w:pPr></w:p>");
++		write("</w:ftr>");
++		
++		
++	}
++	
++	private String getPageNumbering(String props, String alignment){
++		StringBuilder text = new StringBuilder();
++		
++		text.append(" <w:r>");
++		text.append(props);
++		text.append("<w:ptab w:relativeTo=\"margin\"");
++		text.append(" w:alignment=\""+ alignment+"\" w:leader=\"none\"/>");
++		text.append("<w:t xml:space=\"preserve\">Page </w:t>");
++		text.append(" </w:r>");
++		
++		//Begin section
++		text.append(" <w:r>");
++		text.append(props);
++		text.append("<w:fldChar w:fldCharType=\"begin\"/>");
++		text.append(" </w:r>");
++		//Start the paging info
++		text.append(" <w:r>");
++		text.append(props);
++		text.append("<w:instrText xml:space=\"preserve\"> PAGE   \\* MERGEFORMAT </w:instrText>");
++		text.append(" </w:r>");
++		//Separator
++		text.append(" <w:r>");
++		text.append(props);
++		text.append("<w:fldChar w:fldCharType=\"separate\"/>");
++		text.append(" </w:r>");
++		//Total page no
++		text.append(" <w:r>");
++		text.append(props);
++		text.append("<w:t>1</w:t>");
++		text.append(" </w:r>");
++		//End of start
++		text.append(" <w:r>");
++		text.append(props);
++		text.append("<w:fldChar w:fldCharType=\"end\"/>");
++		text.append(" </w:r>");
++
++		//Custom Separator
++		text.append(" <w:r>");
++		text.append(props);
++		text.append("<w:t xml:space=\"preserve\"> of </w:t>");
++		text.append(" </w:r>");
++		//Begin section
++		text.append(" <w:r>");
++		text.append(props);
++		text.append("<w:fldChar w:fldCharType=\"begin\"/>");
++		text.append(" </w:r>");
++		//Start the paging info
++		text.append(" <w:r>");
++		text.append(props);
++		text.append("<w:instrText xml:space=\"preserve\"> NUMPAGES  \\* Arabic  \\* MERGEFORMAT </w:instrText>");
++		text.append(" </w:r>");
++		//Separator
++		text.append(" <w:r>");
++		text.append(props);
++		text.append("<w:fldChar w:fldCharType=\"separate\"/>");
++		text.append(" </w:r>");
++		//Total page no
++		text.append(" <w:r>");
++		text.append(props);
++		text.append("<w:t>1</w:t>");
++		text.append(" </w:r>");
++		//End of start
++		text.append(" <w:r>");
++		text.append(props);
++		text.append("<w:fldChar w:fldCharType=\"end\"/>");
++		text.append(" </w:r>");
++		return text.toString();
++	}
++	
++	private String getAlignment(JRPrintText jrPrintText){
++		//center, left, right
++		String alignment = "left";
++		if(null == jrPrintText){
++			return alignment;
++		}
++		if(jrPrintText.getX() > 200 && jrPrintText.getX() < 350){
++			alignment = "center";
++		}else if(jrPrintText.getX() > 350){
++			alignment = "right";
++		}
++		return alignment;
++	}
++	
++}
+diff --git a/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxHeaderHelper.java b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxHeaderHelper.java
+new file mode 100644
+index 0000000..d71cd92
+--- /dev/null
++++ b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxHeaderHelper.java
+@@ -0,0 +1,331 @@
++/*
++ * JasperReports - Free Java Reporting Library.
++ * Copyright (C) 2001 - 2014 TIBCO Software Inc. All rights reserved.
++ * http://www.jaspersoft.com
++ *
++ * Unless you have purchased a commercial license agreement from Jaspersoft,
++ * the following license terms apply:
++ *
++ * This program is part of JasperReports.
++ *
++ * JasperReports is free software: you can redistribute it and/or modify
++ * it under the terms of the GNU Lesser General Public License as published by
++ * the Free Software Foundation, either version 3 of the License, or
++ * (at your option) any later version.
++ *
++ * JasperReports is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
++ * GNU Lesser General Public License for more details.
++ *
++ * You should have received a copy of the GNU Lesser General Public License
++ * along with JasperReports. If not, see <http://www.gnu.org/licenses/>.
++ */
++package net.sf.jasperreports.engine.export.ooxml;
++
++import java.awt.Color;
++import java.awt.font.TextAttribute;
++import java.io.Writer;
++import java.text.AttributedCharacterIterator.Attribute;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++
++import net.sf.jasperreports.engine.JRPrintText;
++import net.sf.jasperreports.engine.JasperReportsContext;
++import net.sf.jasperreports.engine.fonts.FontFamily;
++import net.sf.jasperreports.engine.fonts.FontInfo;
++import net.sf.jasperreports.engine.fonts.FontUtil;
++import net.sf.jasperreports.engine.type.ColorEnum;
++import net.sf.jasperreports.engine.util.JRColorUtil;
++import net.sf.jasperreports.engine.util.JRStringUtil;
++import net.sf.jasperreports.engine.util.JRStyledText;
++
++
++/**
++ * 
++ * @author chandan.kumar
++ *
++ */
++public class DocxHeaderHelper extends BaseHelper
++{
++
++	/**
++	 * 
++	 */
++	public DocxHeaderHelper(JasperReportsContext jasperReportsContext, Writer writer)
++	{
++		super(jasperReportsContext, writer);
++	}
++
++	/**
++	 * 
++	 */
++	public void export(Map<JRPrintText,JRStyledText> headers, String exporterKey)
++	{
++		write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
++		
++		write("<w:hdr xmlns:ve=\"http://schemas.openxmlformats.org/markup-compatibility/2006\"");
++		write(" xmlns:o=\"urn:schemas-microsoft-com:office:office\"");
++		write(" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"");
++		write(" xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\"");
++		write(" xmlns:v=\"urn:schemas-microsoft-com:vml\""); 
++		write(" xmlns:wp=\"http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing\"");
++		write(" xmlns:w10=\"urn:schemas-microsoft-com:office:word\"");
++		write(" xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"");
++		write(" xmlns:wne=\"http://schemas.microsoft.com/office/word/2006/wordml\">\n");
++		
++		write("<w:p>");
++		write(" <w:pPr>");
++		/*write("<w:bidi w:val=\"0\" /><w:spacing w:before=\"0\" />");
++		write("<w:jc w:val=\"left\" />");*/
++		write("<w:tabs><w:tab w:val=\"center\" w:pos=\"4680\"/><w:tab w:val=\"right\" w:pos=\"9360\"/></w:tabs>");
++		write("<w:spacing w:before=\"0\" w:after=\"0\" w:line=\"240\" w:lineRule=\"auto\"/>");
++		write(" </w:pPr>");
++	
++		for(JRPrintText jrPrintText : headers.keySet()){
++			JRStyledText styledText = headers.get(jrPrintText);
++			
++			
++			if(null != jrPrintText){
++				write(" <w:r>");
++				String props = exportProps(styledText, jasperReportsContext, exporterKey);
++				if(null != props && props.length() > 0){
++					write(props);
++				}
++				
++				write("<w:ptab w:relativeTo=\"margin\"");
++				
++				write(" w:alignment=\""+ getAlignment(jrPrintText) +"\" w:leader=\"none\"/>");
++				
++				write(" <w:t>" + JRStringUtil.xmlEncode(jrPrintText.getFullText()) +" </w:t>");
++				write(" </w:r>");
++			}
++		}
++		write("</w:p>");
++		
++		write("<w:p>");
++		write(" <w:pPr><w:spacing w:line=\"240\" w:lineRule=\"auto\" />"
++				+ " <w:rPr></w:rPr></w:pPr></w:p>");
++		/*write(" <w:pPr><w:spacing w:before=\"100\" w:after=\"100\" w:line=\"240\" w:lineRule=\"auto\" />"
++				+ " <w:rPr><w:sz w:val=\"24\" /></w:rPr></w:pPr></w:p>");*/
++		
++		write("</w:hdr>");
++		
++		
++	}
++	
++	private String getAlignment(JRPrintText jrPrintText){
++		//center, left, right
++		String alignment = "left";
++		if(null == jrPrintText){
++			return alignment;
++		}
++		if(jrPrintText.getX() > 200 && jrPrintText.getX() < 350){
++			alignment = "center";
++		}else if(jrPrintText.getX() > 350){
++			alignment = "right";
++		}
++		return alignment;
++	}
++	
++	public static String exportProps(JRStyledText styledText, JasperReportsContext jasperReportsContext, String exporterKey)
++	{
++		Map<Attribute,Object> attrs = null;
++		if(null != styledText && null != styledText.getAttributedString() && null != styledText.getAttributedString().getIterator()){
++			attrs = styledText.getAttributedString().getIterator().getAttributes();
++		}
++		
++		if(null == attrs){
++			return "";
++		}
++		StringBuilder props = new StringBuilder();
++		props.append("       <w:rPr>\n");
++		
++		Object value = attrs.get(TextAttribute.FAMILY);
++
++		if (value != null)
++		{
++			String fontFamilyAttr = (String)value;
++			String fontFamily = fontFamilyAttr;
++			FontInfo fontInfo = FontUtil.getInstance(jasperReportsContext).getFontInfo(fontFamilyAttr, null);
++			if (fontInfo != null)
++			{
++				//fontName found in font extensions
++				FontFamily family = fontInfo.getFontFamily();
++				String exportFont = family.getExportFont(exporterKey);
++				if (exportFont != null)
++				{
++					fontFamily = exportFont;
++				}
++			}
++			props.append("        <w:rFonts w:ascii=\"" + fontFamily + "\" w:hAnsi=\"" + fontFamily + "\" w:eastAsia=\"" + fontFamily + "\" w:cs=\"" + fontFamily + "\" />\n");
++		}
++		
++		value = attrs.get(TextAttribute.FOREGROUND);
++		
++		if (value != null)
++		{
++			props.append("        <w:color w:val=\"" + JRColorUtil.getColorHexa((Color)value) + "\" />\n");
++		}
++		
++
++		value = attrs.get(TextAttribute.BACKGROUND);
++
++		if (value != null && ColorEnum.getByColor((Color)value) != null)
++		{
++			//the highlight does not accept the color hexadecimal expression, but only few color names
++			props.append("        <w:highlight w:val=\"" + ColorEnum.getByColor((Color)value).getName() + "\" />\n");
++		}
++		
++		
++		value = attrs.get(TextAttribute.SIZE);
++		
++		if (value != null)
++		{
++			float fontSize = ((Float)value).floatValue();
++			fontSize = fontSize == 0 ? 0.5f : fontSize;// only the special EMPTY_CELL_STYLE would have font size zero
++			props.append("        <w:sz w:val=\"" + (int)(2 * fontSize) + "\" />\n");
++		}
++		
++		value = attrs.get(TextAttribute.WEIGHT);
++		
++		if (value != null)
++		{
++			props.append("        <w:b w:val=\"" + value.equals(TextAttribute.WEIGHT_BOLD) + "\"/>\n");
++		}
++		
++		value = attrs.get(TextAttribute.POSTURE);
++		
++		if (value != null)
++		{
++			props.append("        <w:i w:val=\"" + value.equals(TextAttribute.POSTURE_OBLIQUE) + "\"/>\n");
++		}
++		
++		
++		value = attrs.get(TextAttribute.UNDERLINE);
++		
++		if (value != null)
++		{
++			props.append("        <w:u w:val=\"" + (value == null ? "none" : "single") + "\"/>\n");
++		}
++		
++		value = attrs.get(TextAttribute.STRIKETHROUGH);
++		
++		if (value != null)
++		{
++			props.append("        <w:strike w:val=\"" + (value != null) + "\"/>\n");
++		}
++		
++		value = attrs.get(TextAttribute.SUPERSCRIPT);
++		
++		if (TextAttribute.SUPERSCRIPT_SUPER.equals(value))
++		{
++			props.append("        <w:vertAlign w:val=\"superscript\" />\n");
++		}
++		else if (TextAttribute.SUPERSCRIPT_SUB.equals(value))
++		{
++			props.append("        <w:vertAlign w:val=\"subscript\" />\n");
++		}
++		
++		
++		props.append("       </w:rPr>\n");
++		return props.toString();
++	}
++	
++	
++	/*public void exportProps(Map<Attribute,Object> attrs, String exporterKey)
++	{
++		write("       <w:rPr>\n");
++		
++		Object value = attrs.get(TextAttribute.FAMILY);
++
++		if (value != null)
++		{
++			String fontFamilyAttr = (String)value;
++			String fontFamily = fontFamilyAttr;
++			FontInfo fontInfo = FontUtil.getInstance(jasperReportsContext).getFontInfo(fontFamilyAttr, null);
++			if (fontInfo != null)
++			{
++				//fontName found in font extensions
++				FontFamily family = fontInfo.getFontFamily();
++				String exportFont = family.getExportFont(exporterKey);
++				if (exportFont != null)
++				{
++					fontFamily = exportFont;
++				}
++			}
++			write("        <w:rFonts w:ascii=\"" + fontFamily + "\" w:hAnsi=\"" + fontFamily + "\" w:eastAsia=\"" + fontFamily + "\" w:cs=\"" + fontFamily + "\" />\n");
++		}
++		
++		value = attrs.get(TextAttribute.FOREGROUND);
++		
++		if (value != null)
++		{
++			write("        <w:color w:val=\"" + JRColorUtil.getColorHexa((Color)value) + "\" />\n");
++		}
++		
++
++		value = attrs.get(TextAttribute.BACKGROUND);
++
++		if (value != null && ColorEnum.getByColor((Color)value) != null)
++		{
++			//the highlight does not accept the color hexadecimal expression, but only few color names
++			write("        <w:highlight w:val=\"" + ColorEnum.getByColor((Color)value).getName() + "\" />\n");
++		}
++		
++		
++		value = attrs.get(TextAttribute.SIZE);
++		
++		if (value != null)
++		{
++			float fontSize = ((Float)value).floatValue();
++			fontSize = fontSize == 0 ? 0.5f : fontSize;// only the special EMPTY_CELL_STYLE would have font size zero
++			write("        <w:sz w:val=\"" + (int)(2 * fontSize) + "\" />\n");
++		}
++		
++		value = attrs.get(TextAttribute.WEIGHT);
++		
++		if (value != null)
++		{
++			write("        <w:b w:val=\"" + value.equals(TextAttribute.WEIGHT_BOLD) + "\"/>\n");
++		}
++		
++		value = attrs.get(TextAttribute.POSTURE);
++		
++		if (value != null)
++		{
++			write("        <w:i w:val=\"" + value.equals(TextAttribute.POSTURE_OBLIQUE) + "\"/>\n");
++		}
++		
++		
++		value = attrs.get(TextAttribute.UNDERLINE);
++		
++		if (value != null)
++		{
++			write("        <w:u w:val=\"" + (value == null ? "none" : "single") + "\"/>\n");
++		}
++		
++		value = attrs.get(TextAttribute.STRIKETHROUGH);
++		
++		if (value != null)
++		{
++			write("        <w:strike w:val=\"" + (value != null) + "\"/>\n");
++		}
++		
++		value = attrs.get(TextAttribute.SUPERSCRIPT);
++		
++		if (TextAttribute.SUPERSCRIPT_SUPER.equals(value))
++		{
++			write("        <w:vertAlign w:val=\"superscript\" />\n");
++		}
++		else if (TextAttribute.SUPERSCRIPT_SUB.equals(value))
++		{
++			write("        <w:vertAlign w:val=\"subscript\" />\n");
++		}
++		
++		
++		write("       </w:rPr>\n");
++	}*/
++	
++}
+diff --git a/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxRelsHelper.java b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxRelsHelper.java
+index fd8b812..c23843a 100644
+--- a/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxRelsHelper.java
++++ b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxRelsHelper.java
+@@ -51,6 +51,8 @@ public class DocxRelsHelper extends BaseHelper
+ 		write("<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">\n");
+ 		write(" <Relationship Id=\"rId1\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles\" Target=\"styles.xml\"/>\n");
+ 		write(" <Relationship Id=\"rId2\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings\" Target=\"settings.xml\"/>\n");
++		write(" <Relationship Id=\"rId3\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/header\" Target=\"header1.xml\"/>\n");
++		write(" <Relationship Id=\"rId4\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer\" Target=\"footer1.xml\"/>\n");
+ 	}
+ 	
+ 	/**
+diff --git a/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxZip.java b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxZip.java
+index 46869f2..4157f05 100644
+--- a/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxZip.java
++++ b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/DocxZip.java
+@@ -42,6 +42,8 @@ public class DocxZip extends FileBufferedZip
+ 	private ExportZipEntry stylesEntry;
+ 	private ExportZipEntry settingsEntry;
+ 	private ExportZipEntry relsEntry;
++	private ExportZipEntry headerEntry;
++	private ExportZipEntry footerEntry;
+ 	
+ 	/**
+ 	 * 
+@@ -62,6 +64,10 @@ public class DocxZip extends FileBufferedZip
+ 		
+ 		addEntry("_rels/.rels", "net/sf/jasperreports/engine/export/ooxml/docx/_rels/xml.rels");
+ 		addEntry("[Content_Types].xml", "net/sf/jasperreports/engine/export/ooxml/docx/Content_Types.xml");
++		headerEntry = createEntry("word/header1.xml");
++		addEntry(headerEntry);
++		footerEntry = createEntry("word/footer1.xml");
++		addEntry(footerEntry);
+ 	}
+ 	
+ 	/**
+@@ -95,5 +101,11 @@ public class DocxZip extends FileBufferedZip
+ 	{
+ 		return relsEntry;
+ 	}
++	public ExportZipEntry getHeaderEntry() {
++		return headerEntry;
++	}
++	public ExportZipEntry getFooterEntry() {
++		return footerEntry;
++	}
+ 	
+ }
+diff --git a/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/JRDocxExporter.java b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/JRDocxExporter.java
+index f855b0d..b2edff5 100644
+--- a/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/JRDocxExporter.java
++++ b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/JRDocxExporter.java
+@@ -33,6 +33,7 @@ import java.io.Writer;
+ import java.text.AttributedCharacterIterator;
+ import java.text.AttributedCharacterIterator.Attribute;
+ import java.util.HashMap;
++import java.util.LinkedHashMap;
+ import java.util.LinkedList;
+ import java.util.List;
+ import java.util.Locale;
+@@ -79,6 +80,7 @@ import net.sf.jasperreports.engine.export.JRXmlExporter;
+ import net.sf.jasperreports.engine.export.LengthUtil;
+ import net.sf.jasperreports.engine.export.OccupiedGridCell;
+ import net.sf.jasperreports.engine.export.zip.FileBufferedZipEntry;
++import net.sf.jasperreports.engine.type.BandTypeEnum;
+ import net.sf.jasperreports.engine.type.HorizontalTextAlignEnum;
+ import net.sf.jasperreports.engine.type.HyperlinkTypeEnum;
+ import net.sf.jasperreports.engine.type.LineDirectionEnum;
+@@ -203,6 +205,10 @@ public class JRDocxExporter extends JRAbstractExporter<DocxReportConfiguration,
+ 	
+ 	boolean emptyPageState;
+ 	
++	private Map<JRPrintText,JRStyledText> headers = null;
++	private Map<JRPrintText,JRStyledText> footers = null;
++	private boolean exportCustomHeader = true;
++	private boolean exportCustomFooter = true;
+ 
+ 	protected class ExporterContext extends BaseExporterContext implements JRDocxExporterContext
+ 	{
+@@ -419,7 +425,9 @@ public class JRDocxExporter extends JRAbstractExporter<DocxReportConfiguration,
+ 		
+ 		if (oldPageFormat != null)
+ 		{
+-			docHelper.exportSection(oldPageFormat, pageGridLayout, true);
++			docHelper.exportSection(oldPageFormat, pageGridLayout, true, 
++					(exportCustomHeader && (null != headers && headers.size() > 0)) ? true : false , 
++					(exportCustomFooter && null != footers && footers.size() > 0) ? true : false);
+ 		}
+ 
+ 		docHelper.exportFooter();
+@@ -435,6 +443,22 @@ public class JRDocxExporter extends JRAbstractExporter<DocxReportConfiguration,
+ //				relsHelper.exportHyperlink(id, href);
+ //			}
+ //		}
++		String alignment = "left";//center, left, right
++		int fontSize = 18;
++		String fontFamily = "Arial";
++		if(exportCustomHeader && null != headers){
++			DocxHeaderHelper headerHelper = 
++					new DocxHeaderHelper(jasperReportsContext,
++							docxZip.getHeaderEntry().getWriter());
++			headerHelper.export(headers, getExporterKey());
++			headerHelper.close();
++		}
++		if(exportCustomFooter && null != footers){
++			DocxFooterHelper footerHelper = new DocxFooterHelper(jasperReportsContext, 
++					docxZip.getFooterEntry().getWriter());
++			footerHelper.export(footers, getExporterKey() );
++			footerHelper.close();
++		}
+ 
+ 		relsHelper.exportFooter();
+ 
+@@ -544,6 +568,9 @@ public class JRDocxExporter extends JRAbstractExporter<DocxReportConfiguration,
+ 			boolean allowRowResize = false;
+ 			int maxBottomPadding = 0; //for some strange reason, the bottom margin affects the row height; subtracting it here
+ 			GridRow gridRow = grid.getRow(row);
++			if(!isExportHeaderFooter(gridRow)){
++				continue;
++			}
+ 			int rowSize = gridRow.size();
+ 			for(int col = 0; col < rowSize; col++)
+ 			{
+@@ -1655,5 +1682,52 @@ public class JRDocxExporter extends JRAbstractExporter<DocxReportConfiguration,
+ 		return DOCX_EXPORTER_PROPERTIES_PREFIX;
+ 	}
+ 	
++	private boolean isExportHeaderFooter(GridRow gridRow){
++		int rowSize = gridRow.size();
++		boolean isExport = true;
++		JRExporterGridCell gridCell = null;
++		JRPrintElement element = null;
++		JRPrintText jrPrintText = null;
++		for(int col = 0; col < rowSize; col++)
++		{
++			gridCell = gridRow.get(col);
++			element = gridCell.getElement();
++			if(gridCell.getType() == JRExporterGridCell.TYPE_ELEMENT_CELL){
++				if (element instanceof JRPrintText){
++					jrPrintText = (JRPrintText)element;
++					if(exportCustomHeader && element.getOrigin().getBandTypeValue() == BandTypeEnum.PAGE_HEADER){
++						isExport = false;
++						if(null == headers){
++							headers = new LinkedHashMap<JRPrintText,JRStyledText>();
++						}
++						if(!isHeaderFooterIncluded(headers,jrPrintText)){
++							headers.put(jrPrintText, getStyledText(jrPrintText));
++						}
++					}else if(exportCustomFooter && element.getOrigin().getBandTypeValue() == BandTypeEnum.PAGE_FOOTER){
++						isExport = false;
++						if(null == footers){
++							footers = new LinkedHashMap<JRPrintText,JRStyledText>();
++						}
++						if(!isHeaderFooterIncluded(footers,jrPrintText)){
++							footers.put(jrPrintText, getStyledText(jrPrintText));
++						}
++					}
++				}
++			}
++		}
++		return isExport;
++	}
++	private boolean isHeaderFooterIncluded(Map<JRPrintText,JRStyledText> headerFooter, JRPrintText jrPrintTextObj){
++		boolean hasContent = false;
++		for(JRPrintText jrPrintText : headerFooter.keySet()){
++			if(null != jrPrintText && null !=  jrPrintTextObj){
++				if(jrPrintText.getUUID().equals(jrPrintTextObj.getUUID())){
++					hasContent = true;
++					break;
++				}
++			}
++		}
++		return hasContent;
++	}
+ }
+ 
+diff --git a/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/docx/Content_Types.xml b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/docx/Content_Types.xml
+index 7ab676c..ac56c51 100644
+--- a/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/docx/Content_Types.xml
++++ b/jasperreports/src/net/sf/jasperreports/engine/export/ooxml/docx/Content_Types.xml
+@@ -9,4 +9,6 @@
+   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+   <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
++  <Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>
++  <Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>
+ </Types>
